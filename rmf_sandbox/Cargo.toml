@@ -13,6 +13,7 @@ name = "rmf_sandbox"
 
 [dependencies]
 bevy = "0.7"
+rand = "0.8.5"
 bevy_egui = "0.13"
 serde_yaml = "0.8.23"
 wasm-bindgen = "0.2"

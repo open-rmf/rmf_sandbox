@@ -33,6 +33,9 @@ use bevy_egui::{egui, EguiContext, EguiPlugin};
 mod site_map;
 use site_map::{SiteMap, SiteMapPlugin};
 
+mod actor_control;
+use actor_control::{ActorControlPlugin};
+
 struct MouseLocation {
     previous: Vec2,
 }
@@ -260,7 +263,6 @@ fn egui_ui(
     asset_server: Res<AssetServer>,
     mut active_camera_3d: ResMut<ActiveCamera<Camera3d>>,
     mut exit: EventWriter<AppExit>,
-    mut scene_spawner: ResMut<SceneSpawner>,
 ) {
     let mut controls = query.single_mut();
     egui::TopBottomPanel::top("top_panel")
@@ -271,7 +273,7 @@ fn egui_ui(
                     egui::menu::menu_button(ui, "File", |ui| {
                         if ui.button("Load demo").clicked() {
                             sm.load_demo();
-                            sm.spawn(commands, meshes, materials, asset_server, scene_spawner);
+                            sm.spawn(commands, meshes, materials, asset_server);
                         }
 
                         #[cfg(not(target_arch = "wasm32"))]
@@ -415,6 +417,7 @@ pub fn run() {
         })
         .add_startup_system(setup)
         .add_plugin(SiteMapPlugin)
+        .add_plugin(ActorControlPlugin)
         .add_system(handle_keyboard)
         .add_plugin(EguiPlugin)
         .add_system(camera_controls)
@@ -445,6 +448,7 @@ pub fn run() {
         //.insert_resource(Msaa { samples: 4})
         .add_startup_system(setup)
         .add_plugin(SiteMapPlugin)
+        .add_plugin(ActorControlPlugin)
         .add_system(handle_keyboard)
         .add_plugin(EguiPlugin)
         .add_system(camera_controls)
