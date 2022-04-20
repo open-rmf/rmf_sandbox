@@ -260,6 +260,7 @@ fn egui_ui(
     asset_server: Res<AssetServer>,
     mut active_camera_3d: ResMut<ActiveCamera<Camera3d>>,
     mut exit: EventWriter<AppExit>,
+    mut scene_spawner: ResMut<SceneSpawner>,
 ) {
     let mut controls = query.single_mut();
     egui::TopBottomPanel::top("top_panel")
@@ -270,7 +271,7 @@ fn egui_ui(
                     egui::menu::menu_button(ui, "File", |ui| {
                         if ui.button("Load demo").clicked() {
                             sm.load_demo();
-                            sm.spawn(commands, meshes, materials, asset_server);
+                            sm.spawn(commands, meshes, materials, asset_server, scene_spawner);
                         }
 
                         #[cfg(not(target_arch = "wasm32"))]
@@ -424,7 +425,7 @@ pub fn run() {
                 .with_system(check_browser_window_size)
             )
         .run();
-
+    println!("hello world");
     #[cfg(not(target_arch = "wasm32"))]
     App::new()
         .insert_resource(WindowDescriptor {

@@ -36,6 +36,9 @@ pub struct SiteMap {
     walls: Vec<Wall>,
 }
 
+//struct Animations(Vec<Handle<AnimationClip>>);
+struct Animations(Handle<AnimationClip>);
+
 impl Default for SiteMap {
     fn default() -> Self {
         SiteMap {
@@ -126,13 +129,71 @@ impl SiteMap {
         }
     }
 
+    fn spawn_asset(
+        &self,
+        commands: &mut Commands,
+        _asset_server: &Res<AssetServer>,
+    ) {
+        let gltf = _asset_server.load("/home/luca/ws_sim/rmf_sandbox/rmf_sandbox/assets/models/AmbulanceStretcher/AmbulanceStretcher.gltf#Scene0");
+        let gltf_pbr = _asset_server.load("/home/luca/ws_sim/rmf_sandbox/rmf_sandbox/assets/models/AmbulanceStretcher/AmbulanceStretcher.glb#Scene0");
+
+        commands.spawn_bundle((
+            Transform::from_xyz(1.0, 0.0, 0.0),
+            GlobalTransform::identity(),
+        )).with_children(|parent| {
+            parent.spawn_scene(gltf);
+        });
+
+        commands.spawn_bundle((
+            Transform::from_xyz(2.0, 0.0, 0.0),
+            GlobalTransform::identity(),
+        )).with_children(|parent| {
+            parent.spawn_scene(gltf_pbr);
+        });
+    }
+
+    fn spawn_actor(
+        &self,
+        commands: &mut Commands,
+        _asset_server: &Res<AssetServer>,
+        mut scene_spawner: ResMut<SceneSpawner>,
+    ) {
+
+        for n in 0..2 {
+            println!("Creating actor {}", n);
+            let model = _asset_server.load("/home/luca/ws_sim/rmf_sandbox/rmf_sandbox/assets/models/MaleVisitorPhoneWalk/MaleVisitorPhoneWalk.gltf#Scene0");
+            let animation_path = "/home/luca/ws_sim/rmf_sandbox/rmf_sandbox/assets/models/MaleVisitorPhoneWalk/MaleVisitorPhoneWalk.gltf#Animation0";
+            commands.insert_resource(Animations(_asset_server.load(animation_path)));
+            //commands.insert_resource(Animations(vec![_asset_server.load(animation_path)]));
+            //let animation_path = "/home/luca/ws_sim/rmf_sandbox/rmf_sandbox/assets/models/AnimatedFox/Fox.glb#Animation0";
+            //let model = _asset_server.load("/home/luca/ws_sim/rmf_sandbox/rmf_sandbox/assets/models/AnimatedFox/Fox.glb#Scene0");
+
+            // Now add the animation
+            // And the model
+            commands.spawn_bundle((
+                Transform::from_xyz(-n as f32, 0.0, 0.0),
+                GlobalTransform::identity(),
+            )).with_children(|parent| {
+                parent.spawn_scene(model);
+            });
+            println!("Created actor {}", n);
+
+        }
+
+
+    }
+
     pub fn spawn(
         &self,
         mut commands: Commands,
         mut meshes: ResMut<Assets<Mesh>>,
         mut materials: ResMut<Assets<StandardMaterial>>,
         _asset_server: Res<AssetServer>,
+        mut scene_spawner: ResMut<SceneSpawner>,
     ) {
+        self.spawn_asset(&mut commands, &_asset_server);
+        self.spawn_actor(&mut commands, &_asset_server, scene_spawner);
+
         let mut ofs_x = 0.0;
         let mut ofs_y = 0.0;
         let scale = 1.0 / 100.0;
@@ -247,17 +308,44 @@ pub fn initialize_site_map(
     commands: Commands,
     meshes: ResMut<Assets<Mesh>>,
     materials: ResMut<Assets<StandardMaterial>>,
+    mut scene_spawner: ResMut<SceneSpawner>,
     asset_server: Res<AssetServer>,
 ) {
     let args: Vec<String> = env::args().collect();
     if args.len() >= 2 {
         println!("parsing...");
         sm.load(args[1].clone());
-        sm.spawn(commands, meshes, materials, asset_server);
         println!("parsing complete");
     } else {
         sm.load_demo();
-        sm.spawn(commands, meshes, materials, asset_server);
+    }
+    sm.spawn(commands, meshes, materials, asset_server, scene_spawner);
+}
+
+// Once the scene is loaded, start the animation
+fn setup_scene_once_loaded(
+    animations: Res<Animations>,
+    mut player: Query<&mut AnimationPlayer>,
+    mut done: Local<bool>,
+) {
+    println!("Setting up scene");
+    if !*done {
+        //if let Ok(_) = player.get_single_mut() {
+            println!("Starting actors");
+            for mut player in player.iter_mut() {
+                player.play(animations.0.clone_weak()).repeat();
+                println!("Animating actor");
+                //*done = true;
+            }
+        //}
+        /*
+        if let Ok(mut player) = player.get_single_mut() {
+            for n in 0..10 {
+                player.play(animations.0.clone_weak()).repeat();
+            }
+            *done = true;
+        }
+        */
     }
 }
 
@@ -267,6 +355,7 @@ pub struct SiteMapPlugin;
 impl Plugin for SiteMapPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<SiteMap>()
-           .add_startup_system(initialize_site_map);
+           .add_startup_system(initialize_site_map)
+           .add_system(setup_scene_once_loaded);
     }
 }
