@@ -428,7 +428,7 @@ pub fn run() {
                 .with_system(check_browser_window_size)
             )
         .run();
-    println!("hello world");
+
     #[cfg(not(target_arch = "wasm32"))]
     App::new()
         .insert_resource(WindowDescriptor {
