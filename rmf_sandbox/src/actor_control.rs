@@ -2,9 +2,11 @@ use bevy::prelude::*;
 use rand::prelude::*;
 
 use bevy::utils::HashSet;
+use bevy::utils::HashMap;
 
-//struct Animations(Vec<Handle<AnimationClip>>);
-struct Animations(Handle<AnimationClip>);
+// Usage map["actor_name"]["animation_type"] = handle
+// animation type can be idle or walking
+type AnimationHashMap = HashMap<String, HashMap<String, Handle<AnimationClip>>>;
 
 pub struct ActorControl {
     // Properties here
@@ -45,18 +47,22 @@ impl ActorControl {
     fn spawn_actor(
         &self,
         commands: &mut Commands,
+        animations: &mut AnimationHashMap,
         _asset_server: &Res<AssetServer>,
     ) {
-
         for n in 0..10000 {
-            let model = _asset_server.load("/home/luca/ws_sim/rmf_sandbox/rmf_sandbox/assets/models/MaleVisitorPhoneWalk/MaleVisitorPhoneWalk.gltf#Scene0");
-            let animation_path = "/home/luca/ws_sim/rmf_sandbox/rmf_sandbox/assets/models/MaleVisitorPhoneWalk/MaleVisitorPhoneWalk.gltf#Animation0";
-            commands.insert_resource(Animations(_asset_server.load(animation_path)));
-            //commands.insert_resource(Animations(vec![_asset_server.load(animation_path)]));
-            //let animation_path = "/home/luca/ws_sim/rmf_sandbox/rmf_sandbox/assets/models/AnimatedFox/Fox.glb#Animation0";
-            //let model = _asset_server.load("/home/luca/ws_sim/rmf_sandbox/rmf_sandbox/assets/models/AnimatedFox/Fox.glb#Scene0");
+            let actor_name = "MaleVisitorOnPhone";
+            let model = _asset_server.load("/home/luca/ws_sim/rmf_sandbox/rmf_sandbox/assets/models/MaleVisitorPhoneWalk/MaleVisitorOnPhone_Anim.glb#Scene0");
+            // Only add resource if not existing
+            if !animations.contains_key(actor_name) {
+                let idle_path = "/home/luca/ws_sim/rmf_sandbox/rmf_sandbox/assets/models/MaleVisitorPhoneWalk/MaleVisitorOnPhone_Anim.glb#Animation0";
+                let walking_path = "/home/luca/ws_sim/rmf_sandbox/rmf_sandbox/assets/models/MaleVisitorPhoneWalk/MaleVisitorOnPhone_Anim.glb#Animation1";
+                let mut anim_hash = HashMap::<String, Handle<AnimationClip>>::default();
+                anim_hash.insert("idle".to_string(), _asset_server.load(idle_path));
+                anim_hash.insert("walking".to_string(), _asset_server.load(walking_path));
+                animations.insert(actor_name.to_string(), anim_hash);
+            }
 
-            // Now add the animation
             // And the model
             commands.spawn_bundle((
                 Transform::from_xyz(-n as f32, 0.0, 0.0),
@@ -64,49 +70,46 @@ impl ActorControl {
             )).with_children(|parent| {
                 parent.spawn_scene(model);
             });
-
         }
-
-
     }
 
     pub fn spawn(
         &self,
-        mut commands: Commands,
-        mut meshes: ResMut<Assets<Mesh>>,
-        mut materials: ResMut<Assets<StandardMaterial>>,
+        animations: &mut AnimationHashMap,
+        mut commands: &mut Commands,
         _asset_server: Res<AssetServer>,
     ) {
         self.spawn_asset(&mut commands, &_asset_server);
-        self.spawn_actor(&mut commands, &_asset_server);
+        self.spawn_actor(&mut commands, animations, &_asset_server);
     }
 }
 
 pub fn initialize_actors(
-    mut sm: ResMut<ActorControl>,
-    commands: Commands,
-    meshes: ResMut<Assets<Mesh>>,
-    materials: ResMut<Assets<StandardMaterial>>,
+    sm: ResMut<ActorControl>,
+    mut commands: Commands,
     asset_server: Res<AssetServer>,
 ) {
-    sm.spawn(commands, meshes, materials, asset_server);
+    let mut animations = AnimationHashMap::default();
+    sm.spawn(&mut animations, &mut commands, asset_server);
+    // Add the resource
+    commands.insert_resource(animations);
 }
 
 // Once the scene is loaded, start the animation
 fn setup_scene_once_loaded(
-    animations: Res<Animations>,
+    animations: Res<AnimationHashMap>,
     mut q : Query<(Entity, &mut AnimationPlayer)>,
     mut actor_init: Local<HashSet<Entity>>,
     mut done: Local<bool>,
 ) {
-    // TODO consider passing a list of actors to avoid iterating through all of them at all times
     if !*done {
         for (e, mut player) in q.iter_mut() {
             // Only initialize actor that was not initialized before
             if !actor_init.contains(&e) {
                 let mut rng = rand::thread_rng();
                 let anim_speed = rng.gen::<f32>();
-                player.play(animations.0.clone_weak()).repeat().set_speed(anim_speed);
+                let anim_name = if anim_speed > 0.5 {"idle"} else {"walking"};
+                player.play(animations["MaleVisitorOnPhone"][anim_name].clone_weak()).repeat().set_speed(anim_speed);
                 actor_init.insert(e);
                 //*done = true;
             }
