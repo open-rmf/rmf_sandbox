@@ -4,6 +4,7 @@ use super::measurement::Measurement;
 use super::ui_widgets::VisibleWindows;
 use super::vertex::Vertex;
 use super::wall::Wall;
+use std::collections::HashMap;
 use bevy::prelude::*;
 use bevy::render::camera::{ActiveCamera, Camera3d};
 use bevy::ui::Interaction;
@@ -45,6 +46,11 @@ pub struct Handles {
     pub vertex_mesh: Handle<Mesh>,
     pub vertex_material: Handle<StandardMaterial>,
     pub wall_material: Handle<StandardMaterial>,
+}
+
+#[derive(Default)]
+pub struct MaterialMap {
+    pub materials: HashMap<String, Handle<StandardMaterial>>,
 }
 
 #[derive(Default)]
@@ -325,6 +331,7 @@ impl Plugin for SiteMapPlugin {
             .add_plugin(InspectorPlugin::<Inspector>::new())
             .register_inspectable::<Lane>()
             .init_resource::<Handles>()
+            .init_resource::<MaterialMap>()
             .add_startup_system(init_handles)
             .add_event::<SpawnSiteMap>()
             .add_event::<SpawnSiteMapFilename>()

@@ -1,6 +1,6 @@
 use super::level::Level;
 use super::model::Model;
-use super::site_map::Handles;
+use super::site_map::{Handles, MaterialMap};
 use super::ui_widgets::{OpenGeneratorEvent, VisibleWindows};
 use super::vertex::Vertex;
 use bevy::prelude::*;
@@ -17,11 +17,6 @@ pub struct WarehouseParams {
 pub struct WarehouseState {
     pub requested: WarehouseParams,
     pub spawned: WarehouseParams,
-}
-
-#[derive(Default)]
-pub struct WarehouseHandles {
-    pub concrete_floor_material: Handle<StandardMaterial>,
 }
 
 pub fn warehouse_ui(egui_context: &mut EguiContext, warehouse_state: &mut WarehouseState) {
@@ -50,11 +45,11 @@ fn warehouse_generator(
     mut meshes: ResMut<Assets<Mesh>>,
     mesh_query: Query<(Entity, &Handle<Mesh>)>,
     handles: Res<Handles>,
-    mut warehouse_handles: ResMut<WarehouseHandles>,
     visible_windows: ResMut<VisibleWindows>,
     asset_server: Res<AssetServer>,
     point_light_query: Query<(Entity, &PointLight)>,
     directional_light_query: Query<(Entity, &DirectionalLight)>,
+    material_map: Res<MaterialMap>,
 ) {
     if !visible_windows.generator {
         return;
@@ -113,15 +108,18 @@ fn warehouse_generator(
         }
         level.spawn(&mut commands, &mut meshes, &handles, &asset_server);
 
-        commands.spawn_bundle(PbrBundle {
-            mesh: meshes.add(Mesh::from(shape::Plane { size: width as f32 })),
-            material: handles.default_floor_material.clone(),
-            transform: Transform {
-                rotation: Quat::from_rotation_x(1.57),
+        if material_map.materials.contains_key("concrete_floor") {
+            commands.spawn_bundle(PbrBundle {
+                mesh: meshes.add(Mesh::from(shape::Plane { size: width as f32 })),
+                material: material_map.materials.get("concrete_floor").unwrap().clone(),
+                //handles.default_floor_material.clone(),
+                transform: Transform {
+                    rotation: Quat::from_rotation_x(1.57),
+                    ..Default::default()
+                },
                 ..Default::default()
-            },
-            ..Default::default()
-        });
+            });
+        }
 
         let make_light_grid = true; // todo: select based on WASM and GPU (or not)
         if make_light_grid {
@@ -239,16 +237,26 @@ pub fn warehouse_generator_open(
     mut ev_open: EventReader<OpenGeneratorEvent>,
     asset_server: Res<AssetServer>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut warehouse_handles: ResMut<WarehouseHandles>,
+    mut material_map: ResMut<MaterialMap>,
 ) {
     for ev in ev_open.iter() {
         if ev.generator_name == "warehouse" {
             info!("warehouse_generator_open");
-            let concrete_albedo_handle = asset_server.load("textures/concrete_albedo_1024.png");
-            warehouse_handles.concrete_floor_material = materials.add(StandardMaterial {
-                base_color_texture: Some(concrete_albedo_handle.clone()),
-                ..default()
-            });
+            if !material_map.materials.contains_key("concrete_floor") {
+                let albedo = asset_server.load("sandbox://textures/concrete_albedo_1024.png");
+                let roughness = asset_server.load("sandbox://textures/concrete_roughness_1024.png");
+                let normal = asset_server.load("sandbox://textures/concrete_normal_1024.png");
+                let concrete_floor_handle = materials.add(StandardMaterial {
+                    base_color_texture: Some(albedo.clone()),
+                    perceptual_roughness: 1.0,
+                    metallic_roughness_texture: Some(roughness.clone()),
+                    normal_map_texture: Some(normal.clone()),
+                    ..default()
+                });
+                material_map.materials.insert(
+                    String::from("concrete_floor"),
+                    concrete_floor_handle);
+            }
         }
     }
 }
@@ -257,7 +265,6 @@ pub struct WarehouseGeneratorPlugin;
 
 impl Plugin for WarehouseGeneratorPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<WarehouseHandles>();
         app.insert_resource(WarehouseState {
             requested: WarehouseParams {
                 area: 400.,
