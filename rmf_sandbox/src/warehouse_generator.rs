@@ -1,7 +1,7 @@
 use super::level::Level;
 use super::model::Model;
 use super::site_map::Handles;
-use super::ui_widgets::VisibleWindows;
+use super::ui_widgets::{OpenGeneratorEvent, VisibleWindows};
 use super::vertex::Vertex;
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext};
@@ -17,6 +17,11 @@ pub struct WarehouseParams {
 pub struct WarehouseState {
     pub requested: WarehouseParams,
     pub spawned: WarehouseParams,
+}
+
+#[derive(Default)]
+pub struct WarehouseHandles {
+    pub concrete_floor_material: Handle<StandardMaterial>,
 }
 
 pub fn warehouse_ui(egui_context: &mut EguiContext, warehouse_state: &mut WarehouseState) {
@@ -45,6 +50,7 @@ fn warehouse_generator(
     mut meshes: ResMut<Assets<Mesh>>,
     mesh_query: Query<(Entity, &Handle<Mesh>)>,
     handles: Res<Handles>,
+    mut warehouse_handles: ResMut<WarehouseHandles>,
     visible_windows: ResMut<VisibleWindows>,
     asset_server: Res<AssetServer>,
     point_light_query: Query<(Entity, &PointLight)>,
@@ -229,10 +235,29 @@ fn add_racks(level: &mut Level, x: f64, y: f64, yaw: f64, num_racks: i32, num_st
     }
 }
 
+pub fn warehouse_generator_open(
+    mut ev_open: EventReader<OpenGeneratorEvent>,
+    asset_server: Res<AssetServer>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut warehouse_handles: ResMut<WarehouseHandles>,
+) {
+    for ev in ev_open.iter() {
+        if ev.generator_name == "warehouse" {
+            info!("warehouse_generator_open");
+            let concrete_albedo_handle = asset_server.load("textures/concrete_albedo_1024.png");
+            warehouse_handles.concrete_floor_material = materials.add(StandardMaterial {
+                base_color_texture: Some(concrete_albedo_handle.clone()),
+                ..default()
+            });
+        }
+    }
+}
+
 pub struct WarehouseGeneratorPlugin;
 
 impl Plugin for WarehouseGeneratorPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<WarehouseHandles>();
         app.insert_resource(WarehouseState {
             requested: WarehouseParams {
                 area: 400.,
@@ -242,5 +267,6 @@ impl Plugin for WarehouseGeneratorPlugin {
             ..Default::default()
         });
         app.add_system(warehouse_generator);
+        app.add_system(warehouse_generator_open);
     }
 }

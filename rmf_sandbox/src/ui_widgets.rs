@@ -18,6 +18,12 @@ use super::demo_world::demo_office;
 #[cfg(not(target_arch = "wasm32"))]
 use {bevy::tasks::Task, futures_lite::future, rfd::AsyncFileDialog};
 
+pub struct OpenGeneratorEvent {
+    // we'll use this event to trigger loading of assets unique
+    // to each generator, so we don't have to load them all at startup
+    pub generator_name: String,
+}
+
 pub struct VisibleWindows {
     pub welcome: bool,
     pub generator: bool,
@@ -34,6 +40,7 @@ fn egui_ui(
     mut visible_windows: ResMut<VisibleWindows>,
     mut spawn_yaml_writer: EventWriter<SpawnSiteMapYaml>,
     mut warehouse_state: ResMut<WarehouseState>,
+    mut ev_open_generator: EventWriter<OpenGeneratorEvent>,
 ) {
     let mut controls = query.single_mut();
     egui::TopBottomPanel::top("top").show(egui_context.ctx_mut(), |ui| {
@@ -117,6 +124,7 @@ fn egui_ui(
                     if ui.button("Warehouse generator").clicked() {
                         visible_windows.welcome = false;
                         visible_windows.generator = true;
+                        ev_open_generator.send(OpenGeneratorEvent { generator_name: String::from("warehouse") });
                     }
 
                     #[cfg(not(target_arch = "wasm32"))]
@@ -194,6 +202,7 @@ impl Plugin for UIWidgetsPlugin {
         if !app.world.contains_resource::<EguiContext>() {
             app.add_plugin(EguiPlugin);
         }
+        app.add_event::<OpenGeneratorEvent>();
         app.add_system(egui_ui);
         app.insert_resource(VisibleWindows {
             welcome: true,
