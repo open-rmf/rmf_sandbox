@@ -133,8 +133,8 @@ fn camera_controls(
         if input_mouse.just_released(orbit_button) || input_mouse.just_pressed(orbit_button) {
             // only check for upside down when orbiting started or ended this frame
             // if the camera is "upside" down, panning horizontally would be inverted, so invert the input to make it correct
-            let up = persp_transform.rotation * Vec3::Z;
-            controls.orbit_upside_down = up.z <= 0.0;
+            let up = persp_transform.rotation * Vec3::Y;
+            controls.orbit_upside_down = up.y <= 0.0;
         }
 
         if input_mouse.pressed(orbit_button) && cursor_motion.length_squared() > 0. {
@@ -150,7 +150,7 @@ fn camera_controls(
                 }
             };
             let delta_y = -cursor_motion.y / window_size.y * std::f32::consts::PI;
-            let yaw = Quat::from_rotation_z(-delta_x);
+            let yaw = Quat::from_rotation_y(-delta_x);
             let pitch = Quat::from_rotation_x(-delta_y);
             persp_transform.rotation = yaw * persp_transform.rotation; // global y
             persp_transform.rotation = persp_transform.rotation * pitch; // local x
@@ -208,7 +208,7 @@ fn handle_keyboard(
 fn camera_controls_setup(mut commands: Commands) {
     let proj_entity = commands
         .spawn_bundle(PerspectiveCameraBundle {
-            transform: Transform::from_xyz(-10., -10., 10.).looking_at(Vec3::ZERO, Vec3::Z),
+            transform: Transform::from_xyz(-10., 10., -10.).looking_at(Vec3::ZERO, Vec3::Y),
             ..default()
         })
         .id();
