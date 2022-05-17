@@ -5,6 +5,7 @@ use super::ui_widgets::{OpenGeneratorEvent, VisibleWindows};
 use super::vertex::Vertex;
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext};
+use bevy::render::mesh::{Indices, PrimitiveTopology};
 
 #[derive(Clone, Default, PartialEq)]
 pub struct WarehouseParams {
@@ -43,13 +44,14 @@ fn warehouse_generator(
     mut commands: Commands,
     mut warehouse_state: ResMut<WarehouseState>,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
     mesh_query: Query<(Entity, &Handle<Mesh>)>,
     handles: Res<Handles>,
     visible_windows: ResMut<VisibleWindows>,
     asset_server: Res<AssetServer>,
     point_light_query: Query<(Entity, &PointLight)>,
     directional_light_query: Query<(Entity, &DirectionalLight)>,
-    material_map: Res<MaterialMap>,
+    mut material_map: ResMut<MaterialMap>,
 ) {
     if !visible_windows.generator {
         return;
@@ -106,35 +108,103 @@ fn warehouse_generator(
             let y = (aisle_idx as f64 - (num_aisles as f64 - 1.) / 2.) * aisle_spacing;
             add_racks(&mut level, -width / 2. + 1., y, 0., num_racks, vert_stacks);
         }
-        level.spawn(&mut commands, &mut meshes, &handles, &asset_server);
+        //level.spawn(&mut commands, &mut meshes, &handles, &asset_server);
 
-        if material_map.materials.contains_key("concrete_floor") {
-            commands.spawn_bundle(PbrBundle {
-                mesh: meshes.add(Mesh::from(shape::Plane { size: width as f32 })),
-                material: material_map.materials.get("concrete_floor").unwrap().clone(),
-                //handles.default_floor_material.clone(),
-                transform: Transform {
-                    rotation: Quat::from_rotation_x(1.57),
-                    ..Default::default()
-                },
-                ..Default::default()
+        if !material_map.materials.contains_key("concrete_floor") {
+            let albedo = asset_server.load("sandbox://textures/concrete_albedo_1024.png");
+            //let roughness = asset_server.load("sandbox://textures/concrete_roughness_1024.png");
+            //let normal = asset_server.load("sandbox://textures/concrete_normal_1024.png");
+            let normal = asset_server.load("textures/concrete_normal_1024.hdr");
+            let concrete_floor_handle = materials.add(StandardMaterial {
+                base_color_texture: Some(albedo.clone()),
+                perceptual_roughness: 0.2, //1.0,
+                //metallic_roughness_texture: Some(roughness.clone()),
+                normal_map_texture: Some(normal.clone()),
+                flip_normal_map_y: true,
+                double_sided: true,
+                ..default()
             });
+            material_map.materials.insert(
+                String::from("concrete_floor"),
+                concrete_floor_handle);
         }
+
+        let s = (width / 2.0) as f32;
+        let plane_vertices = [
+            ([-s, -s, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0], [1.0, 0.0, 0.0, 1.0]),
+            ([-s, s, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0], [1.0, 0.0, 0.0, 1.0]),
+            ([s, s, 0.0], [0.0, 0.0, 1.0], [1.0, 1.0], [1.0, 0.0, 0.0, 1.0]),
+            ([s, -s, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0], [1.0, 0.0, 0.0, 1.0]),
+        ];
+        /*
+        let plane_vertices = [
+            ([s, 0.0, -s], [0.0, 1.0, 0.0], [1.0, 1.0], [1.0, 0.0, 0.0, 1.0]),
+            ([s, 0.0, s], [0.0, 1.0, 0.0], [1.0, 0.0], [1.0, 0.0, 0.0, 1.0]),
+            ([-s, 0.0, s], [0.0, 1.0, 0.0], [0.0, 0.0], [1.0, 0.0, 0.0, 1.0]),
+            ([-s, 0.0, -s], [0.0, 1.0, 0.0], [0.0, 1.0], [1.0, 0.0, 0.0, 1.0]),
+        ];
+        */
+        /*
+        let plane_vertices = [
+            ([s, -s, 0.0], [0.0, 0.0, 1.0], [1.0, 1.0], [1.0, 0.0, 0.0, 1.0]),
+            ([s, s, 0.0], [0.0, 0.0, 1.0], [1.0, 0.0], [1.0, 0.0, 0.0, 1.0]),
+            ([-s, s, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0], [1.0, 0.0, 0.0, 1.0]),
+            ([-s, -s, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0], [1.0, 0.0, 0.0, 1.0]),
+        ];
+        */
+
+        //let plane_indices = Indices::U32(vec![0, 1, 2, 0, 2, 3]);
+        let plane_indices = Indices::U32(vec![0, 2, 1, 0, 3, 2]);
+        //let plane_indices = Indices::U32(vec![0, 1, 2, 0, 2, 3]);
+        //let plane_indices = Indices::U32(vec![0, 1, 2]); //, 0, 2, 3]);
+        //let plane_indices = Indices::U32(vec![3, 0, 2]); //, 0, 2, 3]);
+
+        let mut plane_positions = Vec::new();
+        let mut plane_normals = Vec::new();
+        let mut plane_uvs = Vec::new();
+        let mut plane_tangents = Vec::new();
+        for (position, normal, uv, tangent) in &plane_vertices {
+            plane_positions.push(*position);
+            plane_normals.push(*normal);
+            plane_uvs.push(*uv);
+            plane_tangents.push(*tangent);
+        }
+
+        let mut plane_mesh = Mesh::new(PrimitiveTopology::TriangleList);
+        plane_mesh.set_indices(Some(plane_indices));
+        plane_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, plane_positions);
+        plane_mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, plane_normals);
+        plane_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, plane_uvs);
+        plane_mesh.insert_attribute(Mesh::ATTRIBUTE_TANGENT, plane_tangents);
+
+        commands.spawn_bundle(PbrBundle {
+            //mesh: meshes.add(Mesh::from(shape::Plane { size: width as f32 })),
+            mesh: meshes.add(plane_mesh),
+            material: material_map.materials.get("concrete_floor").unwrap().clone(),
+            /*
+            transform: Transform {
+                rotation: Quat::from_rotation_x(1.5707963),
+                ..Default::default()
+            },
+            */
+            ..Default::default()
+        });
 
         let make_light_grid = true; // todo: select based on WASM and GPU (or not)
         if make_light_grid {
             // spawn a grid of lights for this level
-            let light_spacing = 10.;
+            let light_spacing = 50. ; //10.;
             let num_x_lights = (width / light_spacing).ceil() as i32;
             let num_y_lights = (width / light_spacing).ceil() as i32;
             let light_height = (warehouse_state.requested.height as f32) * 1.3 + 1.5;
-            let light_range = light_height * 3.0;
+            let light_range = 10.; //5.; //light_height * 3.0;
             for x_idx in 0..num_x_lights {
                 for y_idx in 0..num_y_lights {
                     let x = (x_idx as f64 - (num_y_lights as f64 - 1.) / 2.) * light_spacing;
                     let y = (y_idx as f64 - (num_x_lights as f64 - 1.) / 2.) * light_spacing;
                     commands.spawn_bundle(PointLightBundle {
                         transform: Transform::from_xyz(x as f32, y as f32, light_height),
+                        //transform: Transform::from_xyz(x as f32, light_height, y as f32),
                         point_light: PointLight {
                             intensity: 2000.,
                             range: light_range,
@@ -143,6 +213,18 @@ fn warehouse_generator(
                         },
                         ..default()
                     });
+
+                    commands
+                        .spawn_bundle(PbrBundle {
+                            mesh: handles.vertex_mesh.clone(),
+                            material: handles.measurement_material.clone(),
+                            transform: Transform {
+                                translation: Vec3::new(x as f32, y as f32, light_height),
+                                rotation: Quat::from_rotation_x(1.57),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        });
                 }
             }
         } else {
@@ -233,6 +315,7 @@ fn add_racks(level: &mut Level, x: f64, y: f64, yaw: f64, num_racks: i32, num_st
     }
 }
 
+/*
 pub fn warehouse_generator_open(
     mut ev_open: EventReader<OpenGeneratorEvent>,
     asset_server: Res<AssetServer>,
@@ -242,24 +325,36 @@ pub fn warehouse_generator_open(
     for ev in ev_open.iter() {
         if ev.generator_name == "warehouse" {
             info!("warehouse_generator_open");
-            if !material_map.materials.contains_key("concrete_floor") {
-                let albedo = asset_server.load("sandbox://textures/concrete_albedo_1024.png");
-                let roughness = asset_server.load("sandbox://textures/concrete_roughness_1024.png");
-                let normal = asset_server.load("sandbox://textures/concrete_normal_1024.png");
-                let concrete_floor_handle = materials.add(StandardMaterial {
-                    base_color_texture: Some(albedo.clone()),
-                    perceptual_roughness: 1.0,
-                    metallic_roughness_texture: Some(roughness.clone()),
-                    normal_map_texture: Some(normal.clone()),
-                    ..default()
-                });
-                material_map.materials.insert(
-                    String::from("concrete_floor"),
-                    concrete_floor_handle);
-            }
+            // not sure exactly what, but maybe some setup steps here...
         }
     }
 }
+*/
+
+/*
+pub fn warehouse_startup_system(
+    asset_server: Res<AssetServer>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut material_map: ResMut<MaterialMap>,
+) {
+    if !material_map.materials.contains_key("concrete_floor") {
+        //let albedo = asset_server.load("sandbox://textures/concrete_albedo_1024.png");
+        //let roughness = asset_server.load("sandbox://textures/concrete_roughness_1024.png");
+        let normal = asset_server.load("sandbox://textures/concrete_normal_1024.png");
+        let concrete_floor_handle = materials.add(StandardMaterial {
+            //base_color_texture: Some(albedo.clone()),
+            perceptual_roughness: 1.0,
+            //metallic_roughness_texture: Some(roughness.clone()),
+            normal_map_texture: Some(normal.clone()),
+            //flip_normal_map_y: true,
+            ..default()
+        });
+        material_map.materials.insert(
+            String::from("concrete_floor"),
+            concrete_floor_handle);
+    }
+}
+*/
 
 pub struct WarehouseGeneratorPlugin;
 
@@ -274,6 +369,7 @@ impl Plugin for WarehouseGeneratorPlugin {
             ..Default::default()
         });
         app.add_system(warehouse_generator);
-        app.add_system(warehouse_generator_open);
+        //app.add_startup_system(warehouse_startup_system);
+        //app.add_system(warehouse_generator_open);
     }
 }
