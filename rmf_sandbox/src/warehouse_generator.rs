@@ -118,21 +118,27 @@ fn warehouse_generator(
     let rack_depth = 1.1;
     let aisle_spacing = aisle_width + 2. * rack_depth;
     let num_aisles = (width / aisle_spacing).floor() as i32;
-    let rack_depth_spacing = 1.3;
+    let rack_depth_spacing = 0.; //1.3;
     //let rack_depth_offset = 0.5;
 
     let vert_stacks = warehouse.height / 2;
 
+    let aisle_turnout_length = 0.7;
+
+    let mut vertex_count = 4;
     for aisle_idx in 0..num_aisles {
         let aisle_y = (aisle_idx as f64 - (num_aisles as f64 - 1.) / 2.) * aisle_spacing;
-        let rack_1_y = aisle_y - aisle_width / 2. + 2. * rack_depth / 2. - rack_depth_spacing;
-        let rack_2_y = aisle_y + aisle_width / 2. + 0. * rack_depth / 2. + rack_depth_spacing;
+        // the GLB model for the shelf racks starts on the corner of the shelf,
+        // so we have to offset it with a bit of awkward arithmetic here
+        let rack_1_y = aisle_y - aisle_width / 2. - rack_depth / 2. + rack_depth / 2.;
+        let rack_2_y = aisle_y + aisle_width / 2. + rack_depth / 2. + rack_depth / 2.;
         let rack_start_x = -(width - 2. * roadway_width) / 2. + 1.;
         add_racks(
             &mut spawner,
             "L1",
             rack_start_x,
             rack_1_y,
+            aisle_y - aisle_turnout_length,
             0.,
             num_racks,
             vert_stacks,
@@ -142,10 +148,38 @@ fn warehouse_generator(
             "L1",
             rack_start_x,
             rack_2_y,
+            aisle_y + aisle_turnout_length,
             0.,
             num_racks,
             vert_stacks,
         );
+
+        for idx in 0..(num_racks + 1) {
+            let rack_x = x + (idx as f64) * rack_length;
+            spawner
+                .spawn_vertex(
+                    level,
+                    Vertex::from_xyz_name(rack_x, aisle_y, 0., "name_FOO"),
+                )
+                .unwrap()
+                .insert(WarehouseRespawnTag);
+            spawner
+                .spawn_vertex(
+                    level,
+                    Vertex::from_xyz_name(rack_x, aisle_y - aisle_turnout_length, 0., "name_FOO"),
+                )
+                .unwrap()
+                .insert(WarehouseRespawnTag);
+            spawner
+                .spawn_vertex(
+                    level,
+                    Vertex::from_xyz_name(rack_x, aisle_y + aisle_turnout_length, 0., "name_FOO"),
+                )
+                .unwrap()
+                .insert(WarehouseRespawnTag);
+        }
+
+
         if settings.graphics_quality == GraphicsQuality::Ultra {
             // for now we're a square
             let num_lights_x = num_aisles;
@@ -161,8 +195,8 @@ fn warehouse_generator(
                             x: light_x,
                             y: aisle_y,
                             z_offset: 1.0 + 2.4 * (vert_stacks as f64),
-                            intensity: 300.0,
-                            range: 10.0,
+                            intensity: 100.0 + 200.0 * (vert_stacks as f64),
+                            range: 10.0 + 2.4 * (vert_stacks as f64),
                         }
                     )
                     .unwrap()
@@ -209,6 +243,7 @@ fn add_racks(
     level: &str,
     x: f64,
     y: f64,
+    vertex_y: f64,
     yaw: f64,
     num_racks: i32,
     num_stacks: i32,
@@ -219,13 +254,14 @@ fn add_racks(
     for idx in 0..(num_racks + 1) {
         for vert_idx in 0..num_stacks {
             let z_offset = (vert_idx as f64) * rack_height;
+            let rack_x = x + (idx as f64) * rack_length;
             spawner
                 .spawn_in_level(
                     level,
                     Model::from_xyz_yaw(
                         "vert_beam1",
                         "OpenRobotics/PalletRackVertBeams",
-                        x + (idx as f64) * rack_length,
+                        rack_x,
                         y,
                         z_offset,
                         yaw,
@@ -235,7 +271,6 @@ fn add_racks(
                 .insert(WarehouseRespawnTag);
 
             if idx < num_racks {
-                let rack_x = x + (idx as f64) * rack_length;
                 spawner
                     .spawn_in_level(
                         level,

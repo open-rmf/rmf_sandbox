@@ -37,4 +37,7 @@ impl Vertex {
             ..Default::default()
         }
     }
+    pub fn from_xyz_name(x: f64, y:f64, z: f64, name: &str) -> Vertex {
+        return Vertex { 0: x, 1: y, 2: z, 3: name.to_string(), 4: VertexProperties::default() };
+    }
 }

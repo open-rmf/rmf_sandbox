@@ -120,6 +120,9 @@ fn init_site_map(
         }
 
         // spawn the floor plane
+        // todo: extrude from real floor polygons only when they exist,
+        // so we don't clobber the warehouse-generator floor
+        /*
         commands
             .spawn_bundle(PbrBundle {
                 mesh: meshes.add(Mesh::from(shape::Plane { size: 100.0 })),
@@ -131,6 +134,7 @@ fn init_site_map(
                 ..Default::default()
             })
             .insert(SiteMapTag);
+        */
     }
     let current_level = sm.levels.keys().next().unwrap();
     commands.insert_resource(SiteMapCurrentLevel(current_level.clone()));
