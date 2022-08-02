@@ -162,15 +162,33 @@ fn despawn_site_map(
 
 fn update_floor(
     mut commands: Commands,
-    q_floors: Query<Entity, Added<Floor>>,
+    q_floors: Query<(Entity, &Floor), Added<Floor>>,
     mut meshes: ResMut<Assets<Mesh>>,
-    handles: Res<Handles>,
+    asset_server: Res<AssetServer>,
+    mut material_map: ResMut<MaterialMap>,
 ) {
-    for e in q_floors.iter() {
+    for (e, f) in q_floors.iter() {
+        // Get the floor material name
+        //let material_name = f.parameters.texture_name.to_string();
+        let material_name = String::from("floor_tile_test");
+        println!("Spawning floor with material {}", material_name);
+
+        if !material_map.materials.contains_key(&material_name) {
+            println!("Loading material {}", material_name);
+            let material_uri = String::from("sandbox://materials/") + &material_name + ".glb#Material0";
+            //let material_uri = String::from("sandbox://OpenRobotics/Coke.glb#Material0");
+            let glb_material: Handle<StandardMaterial> = asset_server.load(&material_uri);
+            // TODO find how to use the handle returned above to add to materials?
+            material_map
+                .materials
+                .insert(material_name.clone(), glb_material);
+        }
+        let material = material_map.materials.get(&material_name).unwrap();
+
         // spawn the floor plane
         commands.entity(e).insert_bundle(PbrBundle {
             mesh: meshes.add(Mesh::from(shape::Plane { size: 100.0 })),
-            material: handles.default_floor_material.clone(),
+            material: material.clone(),
             transform: Transform {
                 rotation: Quat::from_rotation_x(1.57),
                 ..default()
