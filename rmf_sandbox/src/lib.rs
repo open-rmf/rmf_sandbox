@@ -39,6 +39,7 @@ mod lift;
 mod light;
 mod measurement;
 mod model;
+mod physical_camera;
 mod rbmf;
 mod sandbox_asset_io;
 mod utils;
